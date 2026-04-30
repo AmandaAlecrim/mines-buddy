@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mines Buddy</title>
+    <meta
+      name="description"
+      content="Mines Buddy: um ajudante visual para Campo Minado (Vanilla JS + ES Modules), perfeito em GitHub Pages."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="container">
+      <div class="header">
+        <div>
+          <h1>Mines Buddy</h1>
+          <p class="muted">
+            Ajudante visual para montar e analisar tabuleiros de Campo Minado.
+          </p>
+        </div>
+        <div class="mascotArea" aria-label="Mascote e dicas">
+          <div class="speechBubble" role="status" aria-live="polite">
+            <span id="statusText" class="statusText">
+              Clique em “Analisar” para receber dicas. ˃͈◡˂͈
+            </span>
+          </div>
+          <div class="mascot" aria-hidden="true">
+            <img
+              id="mascotImg"
+              class="mascotImg"
+              src="./assets/landmine.png"
+              alt=""
+              width="200"
+              height="175"
+              decoding="async"
+              loading="eager"
+            />
+          </div>
+        </div>
+        <div class="headerActions">
+          <a
+            class="link headerPortfolio"
+            href="https://amandaalecrim.github.io"
+            target="_blank"
+            rel="noreferrer"
+            >Portfólio</a>
+          <button id="resetCacheBtn" class="link" type="button">
+            Resetar cache
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="card">
+        <h2 class="srOnly">Configuração do tabuleiro</h2>
+        <div class="controls">
+          <div class="field">
+            <label class="label" for="heightInput">Altura (linhas)</label>
+            <input
+              id="heightInput"
+              class="input"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              max="40"
+              value="10"
+            />
+          </div>
+          <div class="field">
+            <label class="label" for="widthInput">Largura (colunas)</label>
+            <input
+              id="widthInput"
+              class="input"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              max="35"
+              value="10"
+            />
+          </div>
+          <div class="field">
+            <label class="label" for="bombsInput">Bombas totais</label>
+            <input
+              id="bombsInput"
+              class="input"
+              type="number"
+              inputmode="numeric"
+              min="0"
+              max="999"
+              value="10"
+            />
+          </div>
+          <div class="field field-grow">
+            <label class="label">Ações</label>
+            <div class="row">
+              <button id="generateBtn" class="btn" type="button">
+                Gerar
+              </button>
+              <button id="analyzeBtn" class="btn primary" type="button">
+                Analisar
+              </button>
+              <button id="resetBtn" class="btn" type="button">Limpar</button>
+            </div>
+          </div>
+        </div>
+
+        <p class="hint">
+          Clique numa célula e escolha: <strong>fechada</strong>,
+          <strong>0</strong>, <strong>1-8</strong> ou <strong>🎀</strong>.
+          Atalhos: <code>0-8</code>, <code>F</code> (🎀) e
+          <code>Backspace</code> (fechar).
+        </p>
+      </section>
+
+      <div class="headerRow" aria-label="Bombas restantes">
+        <div id="bombCounter" class="counter">
+          <span class="counterIcon" aria-hidden="true">🎀</span>
+          <span id="bombCounterText">Bombas restantes: 0/0</span>
+        </div>
+      </div>
+
+      <section class="card">
+        <h2 class="srOnly">Tabuleiro</h2>
+        <div class="boardWrap">
+          <div id="board" class="board" role="grid" aria-label="Tabuleiro"></div>
+          <div id="cellMenu" class="cellMenu" aria-hidden="true"></div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="container footer muted">
+      <div class="footerCol">
+        <p class="footerLine">
+          <strong>Mines Buddy</strong> · © 2026
+          <a class="link" href="https://github.com/AmandaAlecrim" target="_blank" rel="noreferrer">Amanda Alecrim</a>
+          ·
+          <a class="link" href="https://amandaalecrim.github.io" target="_blank" rel="noreferrer">Portfólio</a>
+        </p>
+        <p class="footerLine">
+          <a class="link" href="https://github.com/AmandaAlecrim/mines-buddy" target="_blank" rel="noreferrer">Código no GitHub</a>
+          · HTML5 · CSS3 · JavaScript (módulos ES) · GitHub Pages
+        </p>
+        <p class="footerLine">
+          Mascote (Picrew):
+          <a class="link" href="https://picrew.me/ja/image_maker/2604520" target="_blank" rel="noreferrer">picrew.me/ja/image_maker/2604520</a>
+        </p>
+      </div>
+    </footer>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
