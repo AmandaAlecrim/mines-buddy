@@ -55,9 +55,16 @@ export const MODAL_CONTENTS = Object.freeze({
         <li>Para cada célula que você já abriu no jogo, clique nela aqui
             e escolha o número (<code>0</code> a <code>8</code>) ou marque
             com bandeira (🎀) as bombas conhecidas.</li>
-        <li>Atalhos de teclado: <code>0</code> a <code>8</code> definem
-            números, <code>F</code> coloca bandeira, <code>Backspace</code>
-            fecha a célula novamente. As setas movem o foco.</li>
+        <li>Atalhos de teclado: <code>1</code>–<code>8</code> definem
+            números, <code>0</code> ou <code>Espaço</code> marcam como
+            vazio, <code>F</code> coloca bandeira,
+            <code>Backspace</code> fecha a célula novamente,
+            <code>B</code> aciona o balde de tinta. As setas movem o foco.
+            Os atalhos também funcionam apenas com o mouse passando por
+            cima da célula, sem precisar clicar para focar.</li>
+        <li>O <strong>balde de tinta</strong> 🪣 (no menu da célula ou
+            tecla <code>B</code>) preenche toda a área de células fechadas
+            conectadas com <strong>0</strong> de uma vez.</li>
         <li>Clique em <strong>Analisar</strong> e o Mines Buddy vai
             colocar 🎀 nas células com bomba certa e destacar em rosa as
             células com certeza seguras.</li>

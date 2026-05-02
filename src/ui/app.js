@@ -41,6 +41,8 @@ export function createApp(doc) {
   let statusTimerId = null;
   /** @type {ReturnType<typeof createPlayGame>|null} */
   let playGame = null;
+  /** @type {HTMLElement|null} */
+  let hoveredAnalyzerCell = null;
 
   function debug(...args) {
     console.log("[Mines Buddy]", ...args);
@@ -181,21 +183,6 @@ export function createApp(doc) {
     return true;
   }
 
-  function focusNextCell(r, c) {
-    const cols = gameState.width;
-    const rows = gameState.height;
-    const nextIdx = r * cols + c + 1;
-
-    if (nextIdx >= rows * cols) {
-      getCellEl(r, c)?.blur?.();
-      return;
-    }
-
-    const nr = Math.floor(nextIdx / cols);
-    const nc = nextIdx % cols;
-    if (!focusCell(nr, nc)) getCellEl(r, c)?.blur?.();
-  }
-
   function focusRelative(r, c, dr, dc) {
     const nr = Math.max(0, Math.min(gameState.height - 1, r + dr));
     const nc = Math.max(0, Math.min(gameState.width - 1, c + dc));
@@ -228,6 +215,11 @@ export function createApp(doc) {
     flagBtn.textContent = "🎀";
     grid.appendChild(flagBtn);
 
+    const bucketBtn = createMenuButton("Balde (preencher área com 0)", { kind: "bucket" });
+    bucketBtn.classList.add("is-bucket");
+    bucketBtn.textContent = "🪣";
+    grid.appendChild(bucketBtn);
+
     for (let n = 1; n <= 8; n++) {
       const numberBtn = createMenuButton(String(n), { kind: "number", value: n });
       numberBtn.textContent = String(n);
@@ -256,7 +248,7 @@ export function createApp(doc) {
       setCellState(r, c, { kind: "flag", value: null });
       return true;
     }
-    if (key === "0") {
+    if (key === "0" || key === " " || key === "Spacebar") {
       setCellState(r, c, { kind: "open0", value: null });
       return true;
     }
@@ -264,7 +256,59 @@ export function createApp(doc) {
       setCellState(r, c, { kind: "number", value: Number(key) });
       return true;
     }
+    if (key === "b" || key === "B") {
+      bucketFillZero(r, c);
+      return true;
+    }
     return false;
+  }
+
+  function bucketFillZero(r, c) {
+    const start = gameState.cells[r]?.[c];
+    if (!start || start.kind !== "closed") {
+      setStatusTemporary("O balde só preenche células fechadas.", 2200);
+      return;
+    }
+
+    closeMenu();
+
+    const visited = new Set();
+    const stack = [[r, c]];
+    let painted = 0;
+
+    while (stack.length > 0) {
+      const [cr, cc] = stack.pop();
+      const k = keyOf(cr, cc);
+      if (visited.has(k)) continue;
+      visited.add(k);
+
+      const cell = gameState.cells[cr]?.[cc];
+      if (!cell || cell.kind !== "closed") continue;
+
+      setCellState(cr, cc, { kind: "open0", value: null });
+      painted++;
+
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          const nr = cr + dr;
+          const nc = cc + dc;
+          if (nr >= 0 && nr < gameState.height && nc >= 0 && nc < gameState.width) {
+            stack.push([nr, nc]);
+          }
+        }
+      }
+    }
+
+    if (painted === 0) {
+      setStatusTemporary("Nada para preencher por aqui.", 2200);
+      return;
+    }
+    setMascot(true);
+    setStatusTemporary(
+      `Balde aplicado: ${painted} célula(s) marcada(s) como 0.`,
+      2400,
+    );
   }
 
   function fitBoardToContainer() {
@@ -543,8 +587,64 @@ export function createApp(doc) {
 
       if (applyKeyboardToCell(ev.key, r, c)) {
         ev.preventDefault();
+        ev.stopPropagation();
         closeMenu();
-        focusNextCell(r, c);
+      }
+    });
+
+    els.board.addEventListener("keyup", (ev) => {
+      if ((ev.key === " " || ev.key === "Spacebar") && findCellElement(ev.target)) {
+        ev.preventDefault();
+      }
+    });
+  }
+
+  function bindAnalyzerHover() {
+    els.board.addEventListener("mouseover", (ev) => {
+      const cellEl = findCellElement(ev.target);
+      if (cellEl) hoveredAnalyzerCell = cellEl;
+    });
+    els.board.addEventListener("mouseleave", () => {
+      hoveredAnalyzerCell = null;
+    });
+  }
+
+  function isAnalyzerVisible() {
+    const screen = doc.getElementById("screenAnalyzer");
+    return !!(screen && !screen.hidden);
+  }
+
+  function isEditableTarget(el) {
+    if (!el) return false;
+    if (el instanceof HTMLInputElement) return true;
+    if (el instanceof HTMLTextAreaElement) return true;
+    if (el instanceof HTMLSelectElement) return true;
+    return el.isContentEditable === true;
+  }
+
+  function bindGlobalCellKeyboard() {
+    doc.addEventListener("keydown", (ev) => {
+      if (!isAnalyzerVisible()) return;
+      if (els.modalOverlay.classList.contains("is-open")) return;
+
+      const active = doc.activeElement;
+      if (isEditableTarget(active)) return;
+
+      if (
+        active instanceof HTMLElement &&
+        active.classList.contains("cell") &&
+        els.board.contains(active)
+      ) {
+        return;
+      }
+
+      if (!hoveredAnalyzerCell || !els.board.contains(hoveredAnalyzerCell)) return;
+      const { r, c } = readCellCoords(hoveredAnalyzerCell);
+      if (r == null || c == null) return;
+
+      if (applyKeyboardToCell(ev.key, r, c)) {
+        ev.preventDefault();
+        closeMenu();
       }
     });
   }
@@ -556,13 +656,18 @@ export function createApp(doc) {
       if (!btn || !menuTarget) return;
 
       const payloadRaw = btn.getAttribute("data-payload") || "{}";
-      /** @type {UiCell} */
       const payload = JSON.parse(payloadRaw);
 
       const { r, c } = menuTarget;
-      setCellState(r, c, payload);
+
+      if (payload && payload.kind === "bucket") {
+        closeMenu();
+        bucketFillZero(r, c);
+        return;
+      }
+
+      setCellState(r, c, /** @type {UiCell} */ (payload));
       closeMenu();
-      focusNextCell(r, c);
     });
 
     doc.addEventListener("click", (ev) => {
@@ -626,7 +731,9 @@ export function createApp(doc) {
 
       bindAnalyzerActions();
       bindBoardEvents();
+      bindAnalyzerHover();
       bindCellMenuEvents();
+      bindGlobalCellKeyboard();
       bindNavEvents();
       bindModalEvents();
 

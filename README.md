@@ -13,11 +13,15 @@ Companion visual para Campo Minado, com estética **Jirai Kei**. Tem dois modos:
 - Solver dedutivo + fallback global (usa a contagem total de bombas).
 - Marcação automática de bombas certas (🎀) e destaque rosa em células seguras.
 - Persistência automática em `localStorage` (volta no mesmo estado depois de fechar).
+- Ferramenta **balde de tinta** 🪣: a partir de uma célula fechada, preenche com `0` toda a área de células fechadas conectadas (8 direções). Disponível no menu da célula ou via atalho `B`.
 - Atalhos:
-  - `0` a `8` definem o número.
+  - `1` a `8` definem o número da célula; `0` ou `Espaço` marcam como vazio (open0).
   - `F` coloca/remove bandeira (🎀).
+  - `B` aciona o balde de tinta (preenche a área conectada com `0`).
   - `Backspace` / `Delete` fecham a célula.
   - `↑↓←→` movem o foco no grid.
+  - O foco **não pula** após preencher: a célula atual continua selecionada para ajustes rápidos.
+  - Os atalhos também funcionam só com o **mouse parado em cima** da célula, sem precisar clicar para focar.
 
 ### Modo Jogar
 
@@ -43,6 +47,7 @@ Companion visual para Campo Minado, com estética **Jirai Kei**. Tem dois modos:
 - `aria-label`, `aria-live` e `aria-current` nos elementos relevantes.
 - Modal fecha com `Esc` e clique no overlay.
 - Navegação por setas no grid em ambos os modos.
+- No modo Ajudante, atalhos via teclado funcionam tanto com a célula focada quanto apenas com o mouse posicionado sobre ela, sem deslocar o foco automaticamente.
 
 ## Arquitetura
 
