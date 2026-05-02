@@ -1,9 +1,9 @@
 # Mines Buddy
 
-Companion visual para Campo Minado, com estética **Jirai Kei** / **Gothic Lolita**. Tem dois modos:
+Companion visual para Campo Minado, com estética **Jirai Kei**. Tem dois modos:
 
-1. **Ajudante** — você reproduz aqui o tabuleiro do jogo real (em qualquer site/app) e o Mines Buddy aponta quais células são bombas garantidas e quais são seguras.
-2. **Jogar** — uma partida aleatória de Campo Minado dentro do próprio site, com mascote dando dicas quando você pedir.
+1. **Ajudante** - você reproduz o tabuleiro do jogo real (em qualquer site/app) e o Mines Buddy aponta quais células são bombas garantidas e quais são seguras.
+2. **Jogar** - uma partida aleatória de Campo Minado dentro do próprio site, com mascote dando dicas quando você pedir.
 
 ## Funcionalidades
 
