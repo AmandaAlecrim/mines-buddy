@@ -1,64 +1,56 @@
 import { byId } from "./dom.js";
 import { renderBoard, applyCellView } from "./boardView.js";
 import { decideNextUiActions, UiActionKind } from "./solverBridge.js";
+import { clearGameState, loadGameState, saveGameState } from "./storage.js";
+import { createPlayGame } from "./playGame.js";
+import { MODAL_CONTENTS } from "./modalContents.js";
+import { showAnalyzer, hideAnalyzer } from "./screens.js";
 import {
-  clearGameState,
-  loadGameState,
-  resetCellsKeepConfig,
-  saveGameState,
-} from "./storage.js";
+  ANALYZER_CELL,
+  BOARD,
+  MASCOT,
+  MASCOT_MESSAGE,
+  RANDOM_GAME,
+} from "./constants.js";
 
+const ARROW_KEYS = Object.freeze({
+  ArrowUp: { dr: -1, dc: 0 },
+  ArrowDown: { dr: 1, dc: 0 },
+  ArrowLeft: { dr: 0, dc: -1 },
+  ArrowRight: { dr: 0, dc: 1 },
+});
+
+/**
+ * @typedef {{kind:"closed"|"open0"|"number"|"flag", value:number|null}} UiCell
+ * @typedef {{width:number, height:number, cells:UiCell[][]}} GameState
+ */
+
+/** @param {Document} doc */
 export function createApp(doc) {
-  const els = {
-    heightInput: /** @type {HTMLInputElement} */ (byId(doc, "heightInput")),
-    widthInput: /** @type {HTMLInputElement} */ (byId(doc, "widthInput")),
-    bombsInput: /** @type {HTMLInputElement} */ (byId(doc, "bombsInput")),
-    generateBtn: /** @type {HTMLButtonElement} */ (byId(doc, "generateBtn")),
-    analyzeBtn: /** @type {HTMLButtonElement} */ (byId(doc, "analyzeBtn")),
-    resetBtn: /** @type {HTMLButtonElement} */ (byId(doc, "resetBtn")),
-    resetCacheBtn: /** @type {HTMLButtonElement} */ (byId(doc, "resetCacheBtn")),
-    board: /** @type {HTMLElement} */ (byId(doc, "board")),
-    cellMenu: /** @type {HTMLElement} */ (byId(doc, "cellMenu")),
-    mascotImg: /** @type {HTMLImageElement} */ (byId(doc, "mascotImg")),
-    bombCounterText: /** @type {HTMLElement} */ (byId(doc, "bombCounterText")),
-    statusText: /** @type {HTMLElement} */ (byId(doc, "statusText")),
-  };
+  const els = collectElements(doc);
 
-  /** @type {{width:number, height:number, cells:Array<Array<{kind:"closed"|"open0"|"number"|"flag", value:number|null}>>}} */
-  let gameState = createEmptyState(10, 10);
-
+  /** @type {GameState} */
+  let gameState = createEmptyState(BOARD.DEFAULT_WIDTH, BOARD.DEFAULT_HEIGHT);
   /** @type {{r:number, c:number}|null} */
   let menuTarget = null;
-
   /** @type {Set<string>} */
   const safeHints = new Set();
-
   /** @type {number} */
-  let totalBombs = 10;
-
-  const MASCOT_DEFAULT_SRC = "./assets/landmine.png";
-  const MASCOT_NO_OPTIONS_SRC = "./assets/landmine2.png";
-
-  const INITIAL_STATUS = "Clique em “Analisar” para receber dicas. ˃͈◡˂͈";
-  const CELEBRATION_STATUS =
-    "Todas as bombas marcadas, mandou muito bem! ♡ (˃͈◡˂͈)";
+  let totalBombs = BOARD.DEFAULT_BOMBS;
   /** @type {number|null} */
   let statusTimerId = null;
+  /** @type {ReturnType<typeof createPlayGame>|null} */
+  let playGame = null;
+
+  function debug(...args) {
+    console.log("[Mines Buddy]", ...args);
+  }
 
   function setMascot(hasOptions) {
-    const next = hasOptions ? MASCOT_DEFAULT_SRC : MASCOT_NO_OPTIONS_SRC;
+    const next = hasOptions ? MASCOT.HAPPY_SRC : MASCOT.SAD_SRC;
     if (els.mascotImg.getAttribute("src") !== next) {
       els.mascotImg.setAttribute("src", next);
     }
-  }
-
-  function persist() {
-    saveGameState({
-      width: gameState.width,
-      height: gameState.height,
-      totalBombs,
-      cells: gameState.cells,
-    });
   }
 
   function setStatus(text) {
@@ -73,25 +65,29 @@ export function createApp(doc) {
     setStatus(text);
     statusTimerId = window.setTimeout(() => {
       statusTimerId = null;
-      setStatus(INITIAL_STATUS);
+      setStatus(MASCOT_MESSAGE.INITIAL);
     }, ms);
   }
 
-  function debug(...args) {
-    console.log("[Mines Buddy]", ...args);
+  function persist() {
+    saveGameState({
+      width: gameState.width,
+      height: gameState.height,
+      totalBombs,
+      cells: gameState.cells,
+    });
   }
 
   function countFlags() {
     let flags = 0;
     for (const row of gameState.cells) {
-      for (const c of row) if (c.kind === "flag") flags++;
+      for (const cell of row) if (cell.kind === "flag") flags++;
     }
     return flags;
   }
 
   function updateBombCounter() {
-    const flags = countFlags();
-    const remaining = Math.max(0, totalBombs - flags);
+    const remaining = Math.max(0, totalBombs - countFlags());
     els.bombCounterText.textContent = `Bombas restantes: ${remaining}/${totalBombs}`;
   }
 
@@ -99,85 +95,8 @@ export function createApp(doc) {
     if (totalBombs <= 0) return false;
     if (countFlags() !== totalBombs) return false;
     setMascot(true);
-    setStatus(CELEBRATION_STATUS);
+    setStatus(MASCOT_MESSAGE.CELEBRATION);
     return true;
-  }
-
-  function reset() {
-    closeMenu();
-    clearAllHints();
-    setStatus("Tabuleiro limpo (células fechadas).");
-    setMascot(true);
-
-    gameState = createEmptyState(gameState.width, gameState.height);
-    renderBoard(els.board, gameState.width, gameState.height);
-    fitBoardToContainer();
-    updateBombCounter();
-    persist();
-  }
-
-  function resetCache() {
-    clearGameState();
-    closeMenu();
-    clearAllHints();
-
-    totalBombs = 10;
-    gameState = createEmptyState(10, 10);
-
-    els.heightInput.value = "10";
-    els.widthInput.value = "10";
-    els.bombsInput.value = "10";
-
-    renderBoard(els.board, gameState.width, gameState.height);
-    fitBoardToContainer();
-    updateBombCounter();
-    persist();
-
-    setMascot(true);
-    setStatusTemporary("Cache resetado. Tabuleiro padrão carregado.", 3500);
-  }
-
-  function createEmptyState(width, height) {
-    const cells = Array.from({ length: height }, () =>
-      Array.from({ length: width }, () => ({ kind: "closed", value: null })),
-    );
-    return { width, height, cells };
-  }
-
-  function parseSize(el, fallback) {
-    const n = Number(el.value);
-    if (!Number.isFinite(n)) return fallback;
-    const i = Math.trunc(n);
-    return Math.max(1, Math.min(35, i));
-  }
-
-  function parseBombs(el, maxCells, fallback) {
-    const n = Number(el.value);
-    if (!Number.isFinite(n)) return fallback;
-    const i = Math.trunc(n);
-    return Math.max(0, Math.min(maxCells, i));
-  }
-
-  function generateBoardFromInputs() {
-    const height = parseSize(els.heightInput, 10);
-    const width = parseSize(els.widthInput, 10);
-    const maxCells = width * height;
-    const bombs = parseBombs(els.bombsInput, maxCells, totalBombs);
-
-    els.heightInput.value = String(height);
-    els.widthInput.value = String(width);
-    els.bombsInput.value = String(bombs);
-    totalBombs = bombs;
-
-    gameState = createEmptyState(width, height);
-    renderBoard(els.board, width, height);
-    fitBoardToContainer();
-    closeMenu();
-    clearAllHints();
-    updateBombCounter();
-    persist();
-    setStatus(`Campo gerado: ${height}x${width} com ${totalBombs} bomba(s).`);
-    setMascot(true);
   }
 
   function getCellEl(r, c) {
@@ -225,24 +144,22 @@ export function createApp(doc) {
     if (safeHints.size === 0) return;
     for (const k of safeHints) {
       const [rStr, cStr] = k.split(",");
-      const r = Number(rStr);
-      const c = Number(cStr);
-      const el = getCellEl(r, c);
+      const el = getCellEl(Number(rStr), Number(cStr));
       if (el) el.classList.remove("hint-safe");
     }
     safeHints.clear();
   }
 
   function openMenuAtCell(r, c, cellEl) {
-    menuTarget = { r, c };
+    const wrap = els.board.parentElement;
+    const wrapRect = wrap?.getBoundingClientRect();
+    if (!wrap || !wrapRect) return;
+
     const rect = cellEl.getBoundingClientRect();
-    const wrapRect = els.board.parentElement?.getBoundingClientRect();
+    const x = rect.left - wrapRect.left + wrap.scrollLeft + 48;
+    const y = rect.top - wrapRect.top + wrap.scrollTop - 10;
 
-    if (!wrapRect) return;
-
-    const x = rect.left - wrapRect.left + els.board.parentElement.scrollLeft + 48;
-    const y = rect.top - wrapRect.top + els.board.parentElement.scrollTop - 10;
-
+    menuTarget = { r, c };
     els.cellMenu.style.left = `${Math.min(x, wrapRect.width - 240)}px`;
     els.cellMenu.style.top = `${Math.max(8, y)}px`;
     els.cellMenu.classList.add("is-open");
@@ -267,19 +184,16 @@ export function createApp(doc) {
   function focusNextCell(r, c) {
     const cols = gameState.width;
     const rows = gameState.height;
-    const idx = r * cols + c;
-    const nextIdx = idx + 1;
+    const nextIdx = r * cols + c + 1;
+
     if (nextIdx >= rows * cols) {
-      const current = getCellEl(r, c);
-      current?.blur?.();
+      getCellEl(r, c)?.blur?.();
       return;
     }
+
     const nr = Math.floor(nextIdx / cols);
     const nc = nextIdx % cols;
-    if (!focusCell(nr, nc)) {
-      const current = getCellEl(r, c);
-      current?.blur?.();
-    }
+    if (!focusCell(nr, nc)) getCellEl(r, c)?.blur?.();
   }
 
   function focusRelative(r, c, dr, dc) {
@@ -293,40 +207,38 @@ export function createApp(doc) {
   function renderMenuContent() {
     els.cellMenu.innerHTML = "";
 
-    const title = document.createElement("p");
+    const title = doc.createElement("p");
     title.className = "menuTitle";
     title.textContent = "Definir célula:";
     els.cellMenu.appendChild(title);
 
-    const grid = document.createElement("div");
+    const grid = doc.createElement("div");
     grid.className = "menuGrid";
 
-    const btnClosed = mkMenuBtn("Fechada", { kind: "closed", value: null });
-    btnClosed.classList.add("is-closed");
-    btnClosed.textContent = "";
-    grid.appendChild(btnClosed);
+    const closedBtn = createMenuButton("Fechada", { kind: "closed", value: null });
+    closedBtn.classList.add("is-closed");
+    grid.appendChild(closedBtn);
 
-    const btnOpen0 = mkMenuBtn("Vazio/0", { kind: "open0", value: null });
-    btnOpen0.classList.add("is-open0");
-    btnOpen0.textContent = "";
-    grid.appendChild(btnOpen0);
+    const openBtn = createMenuButton("Vazio/0", { kind: "open0", value: null });
+    openBtn.classList.add("is-open0");
+    grid.appendChild(openBtn);
 
-    const btnFlag = mkMenuBtn("Bandeira", { kind: "flag", value: null });
-    btnFlag.classList.add("is-flag");
-    btnFlag.textContent = "🎀";
-    grid.appendChild(btnFlag);
+    const flagBtn = createMenuButton("Bandeira", { kind: "flag", value: null });
+    flagBtn.classList.add("is-flag");
+    flagBtn.textContent = "🎀";
+    grid.appendChild(flagBtn);
 
     for (let n = 1; n <= 8; n++) {
-      const btn = mkMenuBtn(String(n), { kind: "number", value: n });
-      btn.textContent = String(n);
-      grid.appendChild(btn);
+      const numberBtn = createMenuButton(String(n), { kind: "number", value: n });
+      numberBtn.textContent = String(n);
+      grid.appendChild(numberBtn);
     }
 
     els.cellMenu.appendChild(grid);
   }
 
-  function mkMenuBtn(label, payload) {
-    const btn = document.createElement("button");
+  function createMenuButton(label, payload) {
+    const btn = doc.createElement("button");
     btn.type = "button";
     btn.className = "menuBtn";
     btn.dataset.action = "setCell";
@@ -357,22 +269,74 @@ export function createApp(doc) {
 
   function fitBoardToContainer() {
     const wrap = els.board.parentElement;
-    if (!wrap) return;
-
     const cols = gameState.width;
-    if (cols <= 0) return;
+    if (!wrap || cols <= 0) return;
 
     const style = getComputedStyle(els.board);
-    const gap = Number.parseFloat(style.getPropertyValue("--cell-gap")) || 8;
-
+    const gap = Number.parseFloat(style.getPropertyValue("--cell-gap")) || ANALYZER_CELL.DEFAULT_GAP;
     const available = Math.max(240, wrap.clientWidth - 24);
-
     const rawSize = Math.floor((available - gap * (cols - 1)) / cols);
-    const clamped = Math.max(22, Math.min(44, rawSize));
+    const size = Math.max(ANALYZER_CELL.MIN_SIZE, Math.min(ANALYZER_CELL.MAX_SIZE, rawSize));
 
-    els.board.style.setProperty("--cell-size", `${clamped}px`);
-    els.board.style.gridTemplateColumns = `repeat(${cols}, var(--cell-size, 44px))`;
-    els.board.style.gridAutoRows = `var(--cell-size, 44px)`;
+    els.board.style.setProperty("--cell-size", `${size}px`);
+    els.board.style.gridTemplateColumns = `repeat(${cols}, var(--cell-size, ${ANALYZER_CELL.MAX_SIZE}px))`;
+    els.board.style.gridAutoRows = `var(--cell-size, ${ANALYZER_CELL.MAX_SIZE}px)`;
+  }
+
+  function reset() {
+    closeMenu();
+    clearAllHints();
+    setStatus("Tabuleiro limpo (células fechadas).");
+    setMascot(true);
+
+    gameState = createEmptyState(gameState.width, gameState.height);
+    renderBoard(els.board, gameState.width, gameState.height);
+    fitBoardToContainer();
+    updateBombCounter();
+    persist();
+  }
+
+  function resetCache() {
+    clearGameState();
+    closeMenu();
+    clearAllHints();
+
+    totalBombs = BOARD.DEFAULT_BOMBS;
+    gameState = createEmptyState(BOARD.DEFAULT_WIDTH, BOARD.DEFAULT_HEIGHT);
+
+    els.heightInput.value = String(BOARD.DEFAULT_HEIGHT);
+    els.widthInput.value = String(BOARD.DEFAULT_WIDTH);
+    els.bombsInput.value = String(BOARD.DEFAULT_BOMBS);
+
+    renderBoard(els.board, gameState.width, gameState.height);
+    fitBoardToContainer();
+    updateBombCounter();
+    persist();
+
+    setMascot(true);
+    setStatusTemporary("Cache resetado. Tabuleiro padrão carregado.", 3500);
+  }
+
+  function generateBoardFromInputs() {
+    const height = parseSize(els.heightInput, BOARD.DEFAULT_HEIGHT, BOARD.MAX_HEIGHT);
+    const width = parseSize(els.widthInput, BOARD.DEFAULT_WIDTH, BOARD.MAX_WIDTH);
+    const bombs = parseBombs(els.bombsInput, width * height, totalBombs);
+
+    els.heightInput.value = String(height);
+    els.widthInput.value = String(width);
+    els.bombsInput.value = String(bombs);
+    totalBombs = bombs;
+
+    gameState = createEmptyState(width, height);
+    renderBoard(els.board, width, height);
+    fitBoardToContainer();
+    closeMenu();
+    clearAllHints();
+    updateBombCounter();
+    persist();
+
+    setStatus(`Campo gerado: ${height}x${width} com ${totalBombs} bomba(s).`);
+    setMascot(true);
   }
 
   function analyzeAndMark() {
@@ -380,10 +344,7 @@ export function createApp(doc) {
     clearAllHints();
 
     try {
-      const hasAnyInfo = gameState.cells.some((row) =>
-        row.some((c) => c.kind !== "closed"),
-      );
-      if (!hasAnyInfo) {
+      if (!hasAnyFilledCell(gameState)) {
         setMascot(true);
         setStatus(
           "O tabuleiro ainda está vazio. Preencha algumas células (0-8 e/ou 🎀) e tente analisar novamente.",
@@ -398,37 +359,18 @@ export function createApp(doc) {
         totalBombs,
       });
 
-      let flagged = 0;
-      let hinted = 0;
-
-      for (const a of decisions) {
-        const current = gameState.cells[a.r]?.[a.c];
-        if (!current) continue;
-
-        if (a.kind === UiActionKind.Flag) {
-          if (current.kind === "closed") {
-            setCellState(a.r, a.c, { kind: "flag", value: null });
-            flagged++;
-          }
-          continue;
-        }
-
-        if (current.kind === "closed") {
-          markSafeHint(a.r, a.c);
-          hinted++;
-        }
-      }
+      const summary = applyDecisions(decisions);
 
       if (celebrateAllBombsFlaggedIfComplete()) {
         debug("decisions", decisions);
         return;
       }
 
-      const hasOptions = flagged + hinted > 0;
+      const hasOptions = summary.flagged + summary.hinted > 0;
       setMascot(hasOptions);
       setStatus(
         hasOptions
-          ? `🎀 ${flagged} bandeira(s) · ✅ ${hinted} casa(s) segura(s)`
+          ? `🎀 ${summary.flagged} bandeira(s) · ✅ ${summary.hinted} casa(s) segura(s)`
           : "Sem dicas seguras agora. (｡•́︿•̀｡)",
       );
       debug("decisions", decisions);
@@ -438,6 +380,94 @@ export function createApp(doc) {
       setMascot(true);
       debug("error", err);
     }
+  }
+
+  function applyDecisions(decisions) {
+    let flagged = 0;
+    let hinted = 0;
+
+    for (const action of decisions) {
+      const current = gameState.cells[action.r]?.[action.c];
+      if (!current) continue;
+
+      if (action.kind === UiActionKind.Flag) {
+        if (current.kind === "closed") {
+          setCellState(action.r, action.c, { kind: "flag", value: null });
+          flagged++;
+        }
+        continue;
+      }
+
+      if (current.kind === "closed") {
+        markSafeHint(action.r, action.c);
+        hinted++;
+      }
+    }
+
+    return { flagged, hinted };
+  }
+
+  function setNavLinkActive(btn, active) {
+    if (!btn) return;
+    btn.classList.toggle("is-active", !!active);
+    btn.setAttribute("aria-current", active ? "true" : "false");
+  }
+
+  function clearModalNavLinkActives() {
+    doc
+      .querySelectorAll(".navLink.is-active[data-modal]")
+      .forEach((b) => setNavLinkActive(/** @type {HTMLElement} */ (b), false));
+  }
+
+  function showAnalyzerScreen() {
+    showAnalyzer(doc);
+    playGame?.hide();
+    setNavLinkActive(els.randomGameBtn, false);
+    setMascot(true);
+    setStatus(MASCOT_MESSAGE.INITIAL);
+  }
+
+  function showPlayScreen() {
+    hideAnalyzer(doc);
+    closeMenu();
+    playGame?.show();
+    setNavLinkActive(els.randomGameBtn, true);
+  }
+
+  function startRandomGame() {
+    if (!playGame) return;
+    showPlayScreen();
+    playGame.startNewGame(pickRandomGameConfig());
+  }
+
+  function openModal(key) {
+    const content = MODAL_CONTENTS[key];
+    if (!content) return;
+    els.modalTitle.textContent = content.title;
+    els.modalBody.innerHTML = content.body;
+    els.modalOverlay.classList.add("is-open");
+    els.modalOverlay.setAttribute("aria-hidden", "false");
+    clearModalNavLinkActives();
+    const trigger = /** @type {HTMLElement|null} */ (
+      doc.querySelector(`.navLink[data-modal="${key}"]`)
+    );
+    setNavLinkActive(trigger, true);
+    setTimeout(() => els.modalClose.focus(), 0);
+  }
+
+  function closeModal() {
+    if (!els.modalOverlay.classList.contains("is-open")) return;
+    els.modalOverlay.classList.remove("is-open");
+    els.modalOverlay.setAttribute("aria-hidden", "true");
+    els.modalBody.innerHTML = "";
+    els.modalTitle.textContent = "";
+    clearModalNavLinkActives();
+  }
+
+  function goHome() {
+    closeModal();
+    showAnalyzerScreen();
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function restoreFromStorageIfAny() {
@@ -461,8 +491,7 @@ export function createApp(doc) {
     for (let r = 0; r < gameState.height; r++) {
       for (let c = 0; c < gameState.width; c++) {
         const cellEl = getCellEl(r, c);
-        if (!cellEl) continue;
-        applyCellView(cellEl, gameState.cells[r][c]);
+        if (cellEl) applyCellView(cellEl, gameState.cells[r][c]);
       }
     }
 
@@ -472,6 +501,110 @@ export function createApp(doc) {
     return true;
   }
 
+  function bindAnalyzerActions() {
+    els.generateBtn.addEventListener("click", generateBoardFromInputs);
+    els.analyzeBtn.addEventListener("click", analyzeAndMark);
+    els.resetBtn.addEventListener("click", reset);
+    els.resetCacheBtn.addEventListener("click", resetCache);
+
+    els.heightInput.addEventListener("change", () => persist());
+    els.widthInput.addEventListener("change", () => persist());
+    els.bombsInput.addEventListener("change", () => {
+      const maxCells = gameState.width * gameState.height;
+      totalBombs = parseBombs(els.bombsInput, maxCells, totalBombs);
+      els.bombsInput.value = String(totalBombs);
+      updateBombCounter();
+      persist();
+    });
+  }
+
+  function bindBoardEvents() {
+    els.board.addEventListener("click", (ev) => {
+      const cellEl = findCellElement(ev.target);
+      if (!cellEl) return;
+      const { r, c } = readCellCoords(cellEl);
+      if (r == null || c == null) return;
+      cellEl.focus();
+      openMenuAtCell(r, c, cellEl);
+    });
+
+    els.board.addEventListener("keydown", (ev) => {
+      const cellEl = findCellElement(ev.target);
+      if (!cellEl) return;
+      const { r, c } = readCellCoords(cellEl);
+      if (r == null || c == null) return;
+
+      const arrow = ARROW_KEYS[ev.key];
+      if (arrow) {
+        ev.preventDefault();
+        focusRelative(r, c, arrow.dr, arrow.dc);
+        return;
+      }
+
+      if (applyKeyboardToCell(ev.key, r, c)) {
+        ev.preventDefault();
+        closeMenu();
+        focusNextCell(r, c);
+      }
+    });
+  }
+
+  function bindCellMenuEvents() {
+    els.cellMenu.addEventListener("click", (ev) => {
+      const target = /** @type {HTMLElement|null} */ (ev.target);
+      const btn = target?.closest?.("button[data-action='setCell']");
+      if (!btn || !menuTarget) return;
+
+      const payloadRaw = btn.getAttribute("data-payload") || "{}";
+      /** @type {UiCell} */
+      const payload = JSON.parse(payloadRaw);
+
+      const { r, c } = menuTarget;
+      setCellState(r, c, payload);
+      closeMenu();
+      focusNextCell(r, c);
+    });
+
+    doc.addEventListener("click", (ev) => {
+      if (!els.cellMenu.classList.contains("is-open")) return;
+      const target = /** @type {HTMLElement|null} */ (ev.target);
+      if (!target) return;
+      if (target.closest?.("#cellMenu")) return;
+      if (target.closest?.(".cell")) return;
+      if (target.closest?.(".mascotArea")) return;
+      closeMenu();
+    });
+  }
+
+  function bindNavEvents() {
+    els.randomGameBtn.addEventListener("click", startRandomGame);
+
+    doc.querySelectorAll("[data-modal]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const key = btn.getAttribute("data-modal");
+        if (key) openModal(key);
+      });
+    });
+
+    const brandLink = doc.querySelector(".topNavBrand");
+    brandLink?.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      goHome();
+    });
+  }
+
+  function bindModalEvents() {
+    els.modalClose.addEventListener("click", closeModal);
+    els.modalOverlay.addEventListener("click", (ev) => {
+      if (ev.target === els.modalOverlay) closeModal();
+    });
+    doc.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape" && els.modalOverlay.classList.contains("is-open")) {
+        closeModal();
+      }
+    });
+  }
+
   return Object.freeze({
     mount() {
       if (!restoreFromStorageIfAny()) {
@@ -479,101 +612,25 @@ export function createApp(doc) {
         fitBoardToContainer();
         updateBombCounter();
         persist();
-        setStatus(INITIAL_STATUS);
+        setStatus(MASCOT_MESSAGE.INITIAL);
         setMascot(true);
       }
 
-      els.generateBtn.addEventListener("click", generateBoardFromInputs);
-      els.analyzeBtn.addEventListener("click", analyzeAndMark);
-      els.resetBtn.addEventListener("click", reset);
-      els.resetCacheBtn.addEventListener("click", resetCache);
+      playGame = createPlayGame(doc, {
+        setMascot,
+        setStatus,
+        setStatusTemporary,
+        onNewRandom: startRandomGame,
+        onBack: showAnalyzerScreen,
+      });
+
+      bindAnalyzerActions();
+      bindBoardEvents();
+      bindCellMenuEvents();
+      bindNavEvents();
+      bindModalEvents();
 
       window.addEventListener("resize", () => fitBoardToContainer());
-
-      els.board.addEventListener("click", (ev) => {
-        const target = /** @type {HTMLElement|null} */ (ev.target);
-        const cellEl = target?.closest?.(".cell");
-        if (!cellEl) return;
-
-        const r = Number(cellEl.dataset.r);
-        const c = Number(cellEl.dataset.c);
-        if (!Number.isInteger(r) || !Number.isInteger(c)) return;
-
-        cellEl.focus();
-        openMenuAtCell(r, c, /** @type {HTMLElement} */ (cellEl));
-      });
-
-      els.board.addEventListener("keydown", (ev) => {
-        const target = /** @type {HTMLElement|null} */ (ev.target);
-        const cellEl = target?.closest?.(".cell");
-        if (!cellEl) return;
-
-        const r = Number(cellEl.dataset.r);
-        const c = Number(cellEl.dataset.c);
-        if (!Number.isInteger(r) || !Number.isInteger(c)) return;
-
-        if (ev.key === "ArrowUp") {
-          ev.preventDefault();
-          focusRelative(r, c, -1, 0);
-          return;
-        }
-        if (ev.key === "ArrowDown") {
-          ev.preventDefault();
-          focusRelative(r, c, 1, 0);
-          return;
-        }
-        if (ev.key === "ArrowLeft") {
-          ev.preventDefault();
-          focusRelative(r, c, 0, -1);
-          return;
-        }
-        if (ev.key === "ArrowRight") {
-          ev.preventDefault();
-          focusRelative(r, c, 0, 1);
-          return;
-        }
-
-        if (applyKeyboardToCell(ev.key, r, c)) {
-          ev.preventDefault();
-          closeMenu();
-          focusNextCell(r, c);
-        }
-      });
-
-      els.cellMenu.addEventListener("click", (ev) => {
-        const target = /** @type {HTMLElement|null} */ (ev.target);
-        const btn = target?.closest?.("button[data-action='setCell']");
-        if (!btn || !menuTarget) return;
-
-        const payloadRaw = btn.getAttribute("data-payload") || "{}";
-        /** @type {{kind:"closed"|"open0"|"number"|"flag", value:number|null}} */
-        const payload = JSON.parse(payloadRaw);
-
-        const { r, c } = menuTarget;
-        setCellState(r, c, payload);
-        closeMenu();
-        focusNextCell(r, c);
-      });
-
-      els.heightInput.addEventListener("change", () => persist());
-      els.widthInput.addEventListener("change", () => persist());
-      els.bombsInput.addEventListener("change", () => {
-        const maxCells = gameState.width * gameState.height;
-        totalBombs = parseBombs(els.bombsInput, maxCells, totalBombs);
-        els.bombsInput.value = String(totalBombs);
-        updateBombCounter();
-        persist();
-      });
-
-      doc.addEventListener("click", (ev) => {
-        if (!els.cellMenu.classList.contains("is-open")) return;
-        const target = /** @type {HTMLElement|null} */ (ev.target);
-        if (!target) return;
-        if (target.closest?.("#cellMenu")) return;
-        if (target.closest?.(".cell")) return;
-        if (target.closest?.(".mascotArea")) return;
-        closeMenu();
-      });
 
       debug("App carregado.");
       return this;
@@ -581,3 +638,85 @@ export function createApp(doc) {
   });
 }
 
+/** @param {Document} doc */
+function collectElements(doc) {
+  return {
+    heightInput: /** @type {HTMLInputElement} */ (byId(doc, "heightInput")),
+    widthInput: /** @type {HTMLInputElement} */ (byId(doc, "widthInput")),
+    bombsInput: /** @type {HTMLInputElement} */ (byId(doc, "bombsInput")),
+    generateBtn: /** @type {HTMLButtonElement} */ (byId(doc, "generateBtn")),
+    analyzeBtn: /** @type {HTMLButtonElement} */ (byId(doc, "analyzeBtn")),
+    resetBtn: /** @type {HTMLButtonElement} */ (byId(doc, "resetBtn")),
+    resetCacheBtn: /** @type {HTMLButtonElement} */ (byId(doc, "resetCacheBtn")),
+    randomGameBtn: /** @type {HTMLButtonElement} */ (byId(doc, "randomGameBtn")),
+    modalOverlay: /** @type {HTMLElement} */ (byId(doc, "modalOverlay")),
+    modalClose: /** @type {HTMLButtonElement} */ (byId(doc, "modalClose")),
+    modalTitle: /** @type {HTMLElement} */ (byId(doc, "modalTitle")),
+    modalBody: /** @type {HTMLElement} */ (byId(doc, "modalBody")),
+    board: /** @type {HTMLElement} */ (byId(doc, "board")),
+    cellMenu: /** @type {HTMLElement} */ (byId(doc, "cellMenu")),
+    mascotImg: /** @type {HTMLImageElement} */ (byId(doc, "mascotImg")),
+    bombCounterText: /** @type {HTMLElement} */ (byId(doc, "bombCounterText")),
+    statusText: /** @type {HTMLElement} */ (byId(doc, "statusText")),
+  };
+}
+
+function createEmptyState(width, height) {
+  const cells = Array.from({ length: height }, () =>
+    Array.from({ length: width }, () => ({ kind: "closed", value: null })),
+  );
+  return { width, height, cells };
+}
+
+function parseSize(el, fallback, max) {
+  const raw = Number(el.value);
+  if (!Number.isFinite(raw)) return fallback;
+  return clamp(Math.trunc(raw), BOARD.MIN_DIMENSION, max);
+}
+
+function parseBombs(el, maxCells, fallback) {
+  const raw = Number(el.value);
+  if (!Number.isFinite(raw)) return fallback;
+  return clamp(Math.trunc(raw), BOARD.MIN_BOMBS, Math.min(BOARD.MAX_BOMBS, maxCells));
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/** @returns {{height:number, width:number, bombs:number}} */
+function pickRandomGameConfig() {
+  const height = randomInt(RANDOM_GAME.MIN_HEIGHT, RANDOM_GAME.MAX_HEIGHT);
+  const width = randomInt(RANDOM_GAME.MIN_WIDTH, RANDOM_GAME.MAX_WIDTH);
+  const total = height * width;
+  const ratioRange = RANDOM_GAME.MAX_BOMB_RATIO - RANDOM_GAME.MIN_BOMB_RATIO;
+  const ratio = RANDOM_GAME.MIN_BOMB_RATIO + Math.random() * ratioRange;
+  const safeMax = total - RANDOM_GAME.FIRST_CLICK_SAFE_AREA;
+  const bombs = clamp(Math.round(total * ratio), RANDOM_GAME.MIN_BOMBS, safeMax);
+  return { height, width, bombs };
+}
+
+/** @param {{cells: UiCell[][]}} state */
+function hasAnyFilledCell(state) {
+  return state.cells.some((row) => row.some((c) => c.kind !== "closed"));
+}
+
+/** @param {EventTarget|null} target */
+function findCellElement(target) {
+  const el = /** @type {HTMLElement|null} */ (target);
+  return /** @type {HTMLElement|null} */ (el?.closest?.(".cell")) ?? null;
+}
+
+/** @param {HTMLElement} cellEl */
+function readCellCoords(cellEl) {
+  const r = Number(cellEl.dataset.r);
+  const c = Number(cellEl.dataset.c);
+  if (!Number.isInteger(r) || !Number.isInteger(c)) {
+    return { r: null, c: null };
+  }
+  return { r, c };
+}

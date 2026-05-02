@@ -11,42 +11,50 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Zen+Maru+Gothic:wght@400;700;900&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header class="container">
-      <div class="header">
-        <div>
+    <nav class="topNav" aria-label="Menu principal">
+      <div class="container topNavInner">
+        <a class="topNavBrand" href="#" aria-label="Mines Buddy: início">
           <h1>Mines Buddy</h1>
-          <p class="muted">
-            Ajudante visual para montar e analisar tabuleiros de Campo Minado.
-          </p>
-        </div>
-        <div class="mascotArea" aria-label="Mascote e dicas">
-          <div class="speechBubble" role="status" aria-live="polite">
-            <span id="statusText" class="statusText">
-              Clique em “Analisar” para receber dicas. ˃͈◡˂͈
-            </span>
-          </div>
-          <div class="mascot" aria-hidden="true">
-            <img
-              id="mascotImg"
-              class="mascotImg"
-              src="./assets/landmine.png"
-              alt=""
-              width="200"
-              height="175"
-              decoding="async"
-              loading="eager"
-            />
-          </div>
-        </div>
-        <div class="headerActions">
+        </a>
+        <ul class="topNavLinks">
+          <li>
+            <button
+              class="navLink"
+              type="button"
+              data-modal="whatIs"
+            >o que é campo minado?</button>
+          </li>
+          <li>
+            <button
+              class="navLink"
+              type="button"
+              data-modal="howToPlay"
+            >como jogar?</button>
+          </li>
+          <li>
+            <button
+              class="navLink"
+              type="button"
+              data-modal="howToUse"
+            >como usar o mines buddy?</button>
+          </li>
+          <li>
+            <button
+              id="randomGameBtn"
+              class="navLink"
+              type="button"
+            >gerar jogo aleatório</button>
+          </li>
+        </ul>
+        <div class="topNavActions">
           <a
-            class="link headerPortfolio"
+            class="link"
             href="https://amandaalecrim.github.io"
             target="_blank"
             rel="noreferrer"
@@ -56,86 +64,161 @@
           </button>
         </div>
       </div>
-    </header>
+    </nav>
 
-    <main class="container">
-      <section class="card">
-        <h2 class="srOnly">Configuração do tabuleiro</h2>
-        <div class="controls">
-          <div class="field">
-            <label class="label" for="heightInput">Altura (linhas)</label>
-            <input
-              id="heightInput"
-              class="input"
-              type="number"
-              inputmode="numeric"
-              min="1"
-              max="40"
-              value="10"
-            />
-          </div>
-          <div class="field">
-            <label class="label" for="widthInput">Largura (colunas)</label>
-            <input
-              id="widthInput"
-              class="input"
-              type="number"
-              inputmode="numeric"
-              min="1"
-              max="35"
-              value="10"
-            />
-          </div>
-          <div class="field">
-            <label class="label" for="bombsInput">Bombas totais</label>
-            <input
-              id="bombsInput"
-              class="input"
-              type="number"
-              inputmode="numeric"
-              min="0"
-              max="999"
-              value="10"
-            />
-          </div>
-          <div class="field field-grow">
-            <label class="label">Ações</label>
-            <div class="row">
-              <button id="generateBtn" class="btn" type="button">
-                Gerar
-              </button>
-              <button id="analyzeBtn" class="btn primary" type="button">
-                Analisar
-              </button>
-              <button id="resetBtn" class="btn" type="button">Limpar</button>
+    <div class="mascotArea" aria-label="Mascote e dicas">
+      <div class="speechBubble" role="status" aria-live="polite">
+        <span id="statusText" class="statusText">
+          Clique em “Analisar” para receber dicas. ˃͈◡˂͈
+        </span>
+      </div>
+      <div class="mascot" aria-hidden="true">
+        <img
+          id="mascotImg"
+          class="mascotImg"
+          src="./assets/landmine.png"
+          alt=""
+          width="200"
+          height="175"
+          decoding="async"
+          loading="eager"
+        />
+      </div>
+    </div>
+
+    <section id="screenAnalyzer" class="screen" aria-label="Tela do ajudante visual">
+      <header class="container">
+        <p class="muted intro">
+          Ajudante visual para montar e analisar tabuleiros de Campo Minado.
+        </p>
+      </header>
+
+      <main class="container">
+        <section class="card">
+          <h2 class="srOnly">Configuração do tabuleiro</h2>
+          <div class="controls">
+            <div class="field">
+              <label class="label" for="heightInput">Altura (linhas)</label>
+              <input
+                id="heightInput"
+                class="input"
+                type="number"
+                inputmode="numeric"
+                min="1"
+                max="40"
+                value="10"
+              />
+            </div>
+            <div class="field">
+              <label class="label" for="widthInput">Largura (colunas)</label>
+              <input
+                id="widthInput"
+                class="input"
+                type="number"
+                inputmode="numeric"
+                min="1"
+                max="35"
+                value="10"
+              />
+            </div>
+            <div class="field">
+              <label class="label" for="bombsInput">Bombas totais</label>
+              <input
+                id="bombsInput"
+                class="input"
+                type="number"
+                inputmode="numeric"
+                min="0"
+                max="999"
+                value="10"
+              />
+            </div>
+            <div class="field field-grow">
+              <label class="label">Ações</label>
+              <div class="row">
+                <button id="generateBtn" class="btn" type="button">
+                  Gerar
+                </button>
+                <button id="analyzeBtn" class="btn primary" type="button">
+                  Analisar
+                </button>
+                <button id="resetBtn" class="btn" type="button">Limpar</button>
+              </div>
             </div>
           </div>
+
+          <p class="hint">
+            Clique numa célula e escolha: <strong>fechada</strong>,
+            <strong>0</strong>, <strong>1-8</strong> ou <strong>🎀</strong>.
+            Atalhos: <code>0-8</code>, <code>F</code> (🎀) e
+            <code>Backspace</code> (fechar).
+          </p>
+        </section>
+
+        <div class="headerRow" aria-label="Bombas restantes">
+          <div id="bombCounter" class="counter">
+            <span class="counterIcon" aria-hidden="true">🎀</span>
+            <span id="bombCounterText">Bombas restantes: 0/0</span>
+          </div>
         </div>
 
-        <p class="hint">
-          Clique numa célula e escolha: <strong>fechada</strong>,
-          <strong>0</strong>, <strong>1-8</strong> ou <strong>🎀</strong>.
-          Atalhos: <code>0-8</code>, <code>F</code> (🎀) e
-          <code>Backspace</code> (fechar).
-        </p>
-      </section>
+        <section class="card">
+          <h2 class="srOnly">Tabuleiro</h2>
+          <div class="boardWrap">
+            <div id="board" class="board" role="grid" aria-label="Tabuleiro"></div>
+            <div id="cellMenu" class="cellMenu" aria-hidden="true"></div>
+          </div>
+        </section>
+      </main>
+    </section>
 
-      <div class="headerRow" aria-label="Bombas restantes">
-        <div id="bombCounter" class="counter">
-          <span class="counterIcon" aria-hidden="true">🎀</span>
-          <span id="bombCounterText">Bombas restantes: 0/0</span>
+    <section id="screenPlay" class="screen" aria-label="Jogo de campo minado" hidden>
+      <header class="container playHeader">
+        <button id="backToAnalyzerBtn" class="btn ghostBtn" type="button">
+          ← Voltar para o ajudante
+        </button>
+        <div class="playToolbar">
+          <div class="playStat" id="playBombsRemaining" aria-live="polite">
+            <span class="playStatIcon" aria-hidden="true">🎀</span>
+            <span id="playBombsRemainingText">0/0</span>
+          </div>
+          <div class="playStat" id="playTimer" aria-live="off">
+            <span class="playStatIcon" aria-hidden="true">⏱</span>
+            <span id="playTimerText">00:00</span>
+          </div>
         </div>
-      </div>
-
-      <section class="card">
-        <h2 class="srOnly">Tabuleiro</h2>
-        <div class="boardWrap">
-          <div id="board" class="board" role="grid" aria-label="Tabuleiro"></div>
-          <div id="cellMenu" class="cellMenu" aria-hidden="true"></div>
+        <div class="playActions">
+          <button id="playHintBtn" class="btn primary" type="button">
+            Pedir dica ♡
+          </button>
+          <button id="playRestartBtn" class="btn" type="button">
+            Reiniciar
+          </button>
+          <button id="playNewRandomBtn" class="btn" type="button">
+            Novo aleatório
+          </button>
         </div>
-      </section>
+      </header>
 
-    </main>
+      <main class="container">
+        <section class="card">
+          <h2 class="srOnly">Tabuleiro do jogo</h2>
+          <p class="hint playHint">
+            Clique para revelar uma célula. Clique com o botão direito (ou
+            <code>F</code>) para colocar/remover uma bandeira (🎀). A primeira
+            jogada nunca é bomba.
+          </p>
+          <div class="boardWrap playBoardWrap">
+            <div
+              id="playBoard"
+              class="board playBoard"
+              role="grid"
+              aria-label="Tabuleiro do jogo"
+            ></div>
+          </div>
+        </section>
+      </main>
+    </section>
 
     <footer class="container footer muted">
       <div class="footerCol">
@@ -155,6 +238,26 @@
         </p>
       </div>
     </footer>
+
+    <div
+      id="modalOverlay"
+      class="modalOverlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modalTitle"
+      aria-hidden="true"
+    >
+      <div class="modal">
+        <button
+          id="modalClose"
+          class="modalClose"
+          type="button"
+          aria-label="Fechar"
+        >×</button>
+        <h2 id="modalTitle" class="modalTitle"></h2>
+        <div id="modalBody" class="modalBody"></div>
+      </div>
+    </div>
 
     <script type="module" src="./src/main.js"></script>
   </body>
