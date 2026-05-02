@@ -792,7 +792,7 @@ button.link:focus-visible{
 .mascotArea{
   position:fixed;
   right:18px;
-  bottom:10px;
+  bottom:0;
   z-index:20;
   display:flex;
   flex-direction:column;
@@ -841,7 +841,7 @@ button.link:focus-visible{
 @media (max-width: 520px){
   .mascotArea{
     right:12px;
-    bottom:8px;
+    bottom:0;
   }
   .mascot{ width:160px; }
   .speechBubble{ max-width:min(320px, 76vw); }
